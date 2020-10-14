@@ -3,29 +3,23 @@ MACHINE_VERSION=v0.10.0
 GO_VERSION=1.13.15
 DESCRIBE=$(shell git describe --tags)
 
-TARGETS=$(addprefix $(PREFIX)-, alpine3.4 alpine3.5 ubuntu14.04 ubuntu16.04 centos7)
+TARGETS=$(PREFIX)
 
 build: $(TARGETS)
 
-$(PREFIX)-%: Dockerfile.%
-	docker rmi -f $@ >/dev/null  2>&1 || true
-	docker rm -f $@-extract > /dev/null 2>&1 || true
-	echo "Building binaries for $@"
+docker-machine-driver-build: Dockerfile
 	docker build --build-arg "MACHINE_VERSION=$(MACHINE_VERSION)" --build-arg "GO_VERSION=$(GO_VERSION)" -t $@ -f $< .
-	docker create --name $@-extract $@ sh
-	docker cp $@-extract:/go/bin/docker-machine-driver-kvm ./
-	mv ./docker-machine-driver-kvm ./$@
-	docker rm $@-extract || true
-	docker rmi $@ || true
+
+docker-machine-driver-kvm: docker-machine-driver-build
+	docker run --rm -w /app -v $(PWD):/app -v $(GOPATH):/go $< go build -v ./cmd/docker-machine-driver-kvm
 
 clean:
-	rm -f ./$(PREFIX)-*
-
+	rm -f ./$(PREFIX)*
 
 release: build
 	@echo "Paste the following into the release page on github and upload the binaries..."
 	@echo ""
-	@for bin in $(PREFIX)-* ; do \
+	@for bin in $(PREFIX)* ; do \
 	    target=$$(echo $${bin} | cut -f5- -d-) ; \
 	    md5=$$(md5sum $${bin}) ; \
 	    echo "* $${target} - md5: $${md5}" ; \
